@@ -59,6 +59,18 @@ logger.info("Successfully deleted new_route data")
 
 df = pd.DataFrame(list_new_routes)
 
+df[[
+    'text_route_number_count',
+    'route_month',
+    'route_year',
+    'teu'
+]] = df[[
+    'text_route_number_count',
+    'route_month',
+    'route_year',
+    'teu'
+]].astype('Int64')
+
 df.info()
 
 # формируем рабочий датасет
@@ -158,8 +170,6 @@ for u in df.index:
 
 
 df = df.replace({np.nan: None, "NaT": None})
-df[['text_route_number_count', 'route_month', 'route_year', 'teu']] = \
-    df[['text_route_number_count', 'route_month', 'route_year', 'teu']].astype('Int64')
 
 try:
     client.insert_df(table=table, df=df)
