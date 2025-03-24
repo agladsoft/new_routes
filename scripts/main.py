@@ -208,10 +208,9 @@ class RouteAnalyzer:
         if matching_values.sum() < 3:
             return False
 
-        changed_fields: Union[List[int], list] = matching_values[matching_values == 0].index.tolist()
-
         # Проверяем только old_text_route_number, если оно пустое, заполняем и обновляем остальные поля
         if pd.isna(df.loc[current_index, 'old_text_route_number']):
+            changed_fields: Union[List[int], list] = matching_values[matching_values == 0].index.tolist()
             df.loc[current_index, 'old_text_route_number'] = previous_route['text_route_number']
             df.loc[current_index, 'changed_field'] = ', '.join(changed_fields)
 
