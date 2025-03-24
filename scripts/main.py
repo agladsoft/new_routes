@@ -261,7 +261,7 @@ class RouteAnalyzer:
         self.save_to_file(df)  # Save before attempting insertion
         try:
             self.client.insert_df(table=self.table, df=df)
-            logger.info(f"Data successfully inserted into {self.table}.")
+            logger.info(f"Data successfully inserted into {self.table}. Number of rows: {len(df)}")
         except Exception as ex_insert:
             logger.error(f"Error inserting data into {self.table}: {ex_insert}")
             sys.exit(1)
