@@ -31,22 +31,22 @@ def sample_data() -> pd.DataFrame:
     :return: A Pandas DataFrame object containing the sample data.
     """
     data: dict = {
-        'text_route_number': ['М_1001', 'М_1002', 'М_1003', 'М_1004', 'М_1005'],
-        'text_route_number_count': ['1', '1', '1', '1', '1'],
-        'route_month': [1, 2, 3, 4, 5],
-        'route_year': [2024, 2024, 2024, 2024, 2024],
-        'teu': [10, 20, 30, 40, 50],
-        'route_min_date': ['2024-01-01', '2024-02-01', '2024-03-01', '2024-03-02', '2024-03-03'],
-        'departure_station_code_of_rf': ['001', '002', '001', '001', '005'],
-        'destination_station_code_of_rf': ['100', '200', '100', '100', '500'],
-        'payer_of_the_railway_tariff_unified': ['PAYER1', 'PAYER2', 'PAYER3', 'PAYER1', 'PAYER5'],
-        'shipper_okpo': ['SHIP1', 'SHIP2', 'SHIP1', 'SHIP1', 'SHIP5'],
-        'consignee_okpo': ['CONS1', 'CONS2', 'CONS1', 'CONS4', 'CONS5'],
-        'departure_station_of_the_rf': ['001', '002', '001', '001', '005'],
-        'rf_destination_station': ['100', '200', '100', '100', '500'],
-        'shipper_by_puzt': ['SHIP1', 'SHIP2', 'SHIP1', 'SHIP1', 'SHIP5'],
-        'consignee_by_puzt': ['CONS1', 'CONS2', 'CONS1', 'CONS4', 'CONS5'],
-        'type_of_transportation': ['TYPE1', 'TYPE2', 'TYPE1', 'TYPE1', 'TYPE5']
+        'text_route_number': ['М_1001', 'М_1002', 'М_1003', 'М_1004', 'М_1005', 'М_1006'],
+        'text_route_number_count': ['1', '1', '1', '1', '1', '1'],
+        'route_month': [1, 2, 3, 4, 5, 6],
+        'route_year': [2024, 2024, 2024, 2024, 2024, 2024],
+        'teu': [10, 20, 30, 40, 50, 60],
+        'route_min_date': ['2024-01-01', '2024-01-01', '2024-02-01', '2024-03-01', '2024-03-02', '2024-03-03'],
+        'departure_station_code_of_rf': ['001', '001', '002', '001', '001', '005'],
+        'destination_station_code_of_rf': ['100', '100', '200', '100', '100', '500'],
+        'payer_of_the_railway_tariff_unified': ['PAYER1', 'PAYER2', 'PAYER3', 'PAYER4', 'PAYER5', 'PAYER6'],
+        'shipper_okpo': ['SHIP1', 'SHIP1', 'SHIP2', 'SHIP1', 'SHIP1', 'SHIP5'],
+        'consignee_okpo': ['CONS1', 'CONS2', 'CONS1', 'CONS4', 'CONS5', 'CONS6'],
+        'departure_station_of_the_rf': ['001', '001', '002', '001', '001', '005'],
+        'rf_destination_station': ['100', '100', '200', '100', '100', '500'],
+        'shipper_by_puzt': ['SHIP1', 'SHIP1', 'SHIP2', 'SHIP1', 'SHIP1', 'SHIP5'],
+        'consignee_by_puzt': ['CONS1', 'CONS1', 'CONS2', 'CONS1', 'CONS4', 'CONS5'],
+        'type_of_transportation': ['TYPE1', 'TYPE1', 'TYPE2', 'TYPE1', 'TYPE1', 'TYPE5']
     }
     return pd.DataFrame(data)
 
@@ -153,9 +153,10 @@ def test_analyze_routes(sample_data: pd.DataFrame, analyzer: RouteAnalyzer) -> N
     # Routes 3 and 4 should be marked as changes because they have similar key parameters to route 1
     assert result['category_route'].iloc[0] == 'Новый маршрут'
     assert result['category_route'].iloc[1] == 'Новый маршрут'
-    assert result['category_route'].iloc[2] == 'Изменение в маршруте'
+    assert result['category_route'].iloc[2] == 'Новый маршрут'
     assert result['category_route'].iloc[3] == 'Изменение в маршруте'
-    assert result['category_route'].iloc[4] == 'Новый маршрут'
+    assert result['category_route'].iloc[4] == 'Изменение в маршруте'
+    assert result['category_route'].iloc[5] == 'Новый маршрут'
 
 
 def test_compare_and_update_routes(sample_data: pd.DataFrame, analyzer: RouteAnalyzer) -> None:
@@ -174,9 +175,9 @@ def test_compare_and_update_routes(sample_data: pd.DataFrame, analyzer: RouteAna
     prepared_data: pd.DataFrame = analyzer.prepare_data(sample_data)
 
     # Compare route 3 (index 2) with route 1 (index 0) - should match
-    result: bool = analyzer.compare_and_update_routes(prepared_data, 2, 0)
+    result: bool = analyzer.compare_and_update_routes(prepared_data, 3, 0)
     assert result
-    assert prepared_data.loc[2, 'old_text_route_number'] == 'М_1001'
+    assert prepared_data.loc[3, 'old_text_route_number'] == 'М_1001'
 
     # Compare route 2 (index 1) with route 1 (index 0) - should not match
     result = analyzer.compare_and_update_routes(prepared_data, 1, 0)
@@ -184,6 +185,10 @@ def test_compare_and_update_routes(sample_data: pd.DataFrame, analyzer: RouteAna
 
     # Compare route 5 (index 4) with route 1 (index 0) - should not match
     result = analyzer.compare_and_update_routes(prepared_data, 4, 0)
+    assert result
+
+    # Compare route 6 (index 5) with route 1 (index 0) - should not match
+    result = analyzer.compare_and_update_routes(prepared_data, 5, 0)
     assert result == False
 
     # Compare route with same date - should not match
