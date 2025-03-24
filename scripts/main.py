@@ -95,7 +95,9 @@ class RouteAnalyzer:
         """
         try:
             logger.info("Fetching data from ClickHouse...")
-            new_routes: QueryResult = self.client.query("SELECT * FROM new_route_rf")
+            new_routes: QueryResult = self.client.query(
+                "SELECT * FROM new_route_rf WHERE text_route_number_count == '1'"
+            )
             if new_routes.result_rows:
                 return pd.DataFrame(new_routes.result_rows, columns=new_routes.column_names)  # type: ignore
             logger.warning("No data found in new_route_rf")
@@ -137,8 +139,7 @@ class RouteAnalyzer:
 
         df['route_min_date'] = pd.to_datetime(df['route_min_date'], errors='coerce').dt.date
         df = (
-            df.query('text_route_number_count == 1')
-            .assign(text_route_number_int=df['text_route_number'].str.replace('М_', '', regex=True).astype('uint32'))
+            df.assign(text_route_number_int=df['text_route_number'].str.replace('М_', '', regex=True).astype('uint32'))
             .sort_values(by=['route_min_date', 'text_route_number_int'])
             .drop(columns=['text_route_number_int'])
             .reset_index(drop=True)
