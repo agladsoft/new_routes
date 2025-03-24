@@ -54,9 +54,10 @@ class RouteAnalyzer:
                 username=get_my_env_var('USERNAME_DB'),
                 password=get_my_env_var('PASSWORD')
             )
+            logger.info("Success connected to clickhouse")
             client.query("SET allow_experimental_lightweight_delete=1")
             client.query(f"DELETE FROM {self.table} WHERE uuid is not NULL")
-            logger.info("Success connect to clickhouse")
+            logger.info(f"Success deleted data from {self.table}")
         except Exception as ex_connect:
             logger.error(f"Error connection to db {ex_connect}. Type error is {type(ex_connect)}.")
             sys.exit(1)
@@ -72,11 +73,14 @@ class RouteAnalyzer:
 
         :return: None
         """
+        logger.info("Starting route analysis process.")
         df: Optional[pd.DataFrame] = self.fetch_data()
         if df is not None:
+            logger.info(f"Fetched {len(df)} rows of data.")
             df = self.prepare_data(df)
             df = self.analyze_routes(df)
             self.insert_data(df)
+            logger.info("Route analysis completed and data inserted.")
 
     def fetch_data(self) -> Optional[pd.DataFrame]:
         """
@@ -90,6 +94,7 @@ class RouteAnalyzer:
         :raises SystemExit: If an error occurs while connecting to ClickHouse.
         """
         try:
+            logger.info("Fetching data from ClickHouse...")
             new_routes: QueryResult = self.client.query("SELECT * FROM new_route_rf")
             if new_routes.result_rows:
                 return pd.DataFrame(new_routes.result_rows, columns=new_routes.column_names)  # type: ignore
@@ -117,6 +122,7 @@ class RouteAnalyzer:
         :param df: A Pandas DataFrame object.
         :return: A Pandas DataFrame object with the transformations applied.
         """
+        logger.info("Preparing data for analysis...")
         df[[
             'text_route_number_count',
             'route_month',
@@ -141,6 +147,7 @@ class RouteAnalyzer:
         df['old_text_route_number'] = None
         df['changed_field'] = None
         df['old_value_field'] = None
+        logger.info(f"Prepared {len(df)} rows of data.")
         return df
 
     def analyze_routes(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -154,14 +161,17 @@ class RouteAnalyzer:
         :param df: A Pandas DataFrame object.
         :return: A Pandas DataFrame object with the 'category_route' column updated.
         """
+        logger.info("Analyzing routes for changes...")
         for i in range(1, len(df)):
             for j in reversed(range(i)):
-                if self.compare_routes(df, i, j):
+                if self.compare_and_update_routes(df, i, j):
                     df.loc[i, 'category_route'] = 'Изменение в маршруте'
+                    logger.debug(f"Route at index {i} marked as 'Изменение в маршруте'")
                     break
+        logger.info("Route analysis completed.")
         return df
 
-    def compare_routes(self, df: pd.DataFrame, current_index: int, previous_index: int) -> bool:
+    def compare_and_update_routes(self, df: pd.DataFrame, current_index: int, previous_index: int) -> bool:
         """
         Compares two routes based on key columns and route_min_date.
 
@@ -246,13 +256,14 @@ class RouteAnalyzer:
 
         :param df: A Pandas DataFrame object.
         """
+        logger.info("Inserting data into ClickHouse...")
         df: pd.DataFrame = df.replace({pd.NA: None, "NaT": None})
         self.save_to_file(df)  # Save before attempting insertion
         try:
             self.client.insert_df(table=self.table, df=df)
-            logger.info("Success insert to clickhouse")
+            logger.info(f"Data successfully inserted into {self.table}.")
         except Exception as ex_insert:
-            logger.error(f"Error inserting data into ClickHouse: {ex_insert}")
+            logger.error(f"Error inserting data into {self.table}: {ex_insert}")
             sys.exit(1)
 
 
