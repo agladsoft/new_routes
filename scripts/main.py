@@ -130,8 +130,13 @@ class RouteAnalyzer:
         ]].astype('Int64')
 
         df['route_min_date'] = pd.to_datetime(df['route_min_date'], errors='coerce').dt.date
-        df = df.query('text_route_number_count == 1').sort_values(by='route_min_date').reset_index(drop=True)
-        df = df.head(138)
+        df = (
+            df.query('text_route_number_count == 1')
+            .assign(text_route_number_int=df['text_route_number'].str.replace('М_', '', regex=True).astype('uint32'))
+            .sort_values(by=['route_min_date', 'text_route_number_int'])
+            .drop(columns=['text_route_number_int'])
+            .reset_index(drop=True)
+        )
         df['category_route'] = 'Новый маршрут'  # Default category
         df['old_text_route_number'] = None
         df['changed_field'] = None
