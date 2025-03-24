@@ -8,6 +8,7 @@ load_dotenv()
 
 LOG_FORMAT: str = "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
 DATE_FTM: str = "%d/%B/%Y %H:%M:%S"
+MIN_MATCHING_KEY_THRESHOLD: int = 3
 
 
 class MissingEnvironmentVariable(Exception):

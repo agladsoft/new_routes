@@ -1,0 +1,21 @@
+@startuml
+
+participant RA as RouteAnalyzer
+participant CH as ClickHouse
+participant DF as DataFrame
+
+RA->RA: fetch_data()
+alt Data found
+    RA->CH: SELECT * FROM new_route_rf
+    CH-->RA: Data
+    RA->DF: pd.DataFrame(data)
+    DF-->RA: DataFrame
+    RA->RA: prepare_data(df)
+    RA->RA: analyze_routes(df)
+    RA->RA: insert_data(df)
+    RA->CH: Insert DataFrame
+else No data found
+    RA-->>RA: return None
+end
+
+@enduml

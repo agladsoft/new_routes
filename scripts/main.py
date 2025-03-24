@@ -2,8 +2,8 @@ import sys
 import pandas as pd
 from __init__ import *
 from typing import Optional
+from datetime import datetime
 from typing import List, Union
-from datetime import datetime, date
 from clickhouse_connect import get_client
 from clickhouse_connect.driver import Client
 from clickhouse_connect.driver.query import QueryResult
@@ -29,17 +29,6 @@ class RouteAnalyzer:
             'shipper_okpo': 'shipper_by_puzt',
             'consignee_okpo': 'consignee_by_puzt'
         }
-
-    def serialize_datetime(self) -> str:
-        """
-        Serialize datetime or date object to ISO-formatted string.
-
-        :return: ISO-formatted string of datetime or date object.
-        :raises TypeError: If the object is not a datetime or date object.
-        """
-        if isinstance(self, (datetime, date)):
-            return self.isoformat()
-        raise TypeError("Type not serializable")
 
     def connect_to_db(self) -> Client:
         """
@@ -183,11 +172,14 @@ class RouteAnalyzer:
         The comparison is done on the following columns: route_min_date, type_of_transportation,
         departure_station_code_of_rf, destination_station_code_of_rf, payer_of_the_railway_tariff_unified,
         shipper_okpo, consignee_okpo.
-        If the values in these columns are equal, the method returns True.
-        If the values are different, the method checks if the old_text_route_number column is empty.
-        If it is, the method fills in the old_text_route_number column with the previous route's text_route_number,
-        and fills in the changed_field and old_value_field columns with the changed fields and their old values.
-        The method returns True if the old_text_route_number column was filled in, False otherwise.
+
+        The following conditions must be met for the method to return True:
+        - The `route_min_date` values **must be different** for the current and previous routes.
+        - The `type_of_transportation` must be the same.
+        - At least `MIN_MATCHING_KEY_THRESHOLD` key columns must match.
+        - If the `old_text_route_number` column is empty, it will be populated with the previous route's `text_route_number`,
+          and the `changed_field` and `old_value_field` columns will store the changed fields and their old values.
+        - The `departure_station_code_of_rf` and `destination_station_code_of_rf` must match.
 
         :param df: A Pandas DataFrame object.
         :param current_index: An integer index of the current row in the dataframe.
@@ -205,7 +197,7 @@ class RouteAnalyzer:
         matching_values: pd.Series = pd.Series(
             current_route[self.key_columns] == previous_route[self.key_columns]
         ).astype(int)
-        if matching_values.sum() < 3:
+        if matching_values.sum() < MIN_MATCHING_KEY_THRESHOLD:
             return False
 
         # Проверяем только old_text_route_number, если оно пустое, заполняем и обновляем остальные поля
