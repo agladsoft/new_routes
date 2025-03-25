@@ -148,7 +148,9 @@ def test_analyze_routes(sample_data: pd.DataFrame, analyzer: RouteAnalyzer) -> N
     :param analyzer: RouteAnalyzer instance with a mocked client.
     """
     prepared_data: pd.DataFrame = analyzer.prepare_data(sample_data)
-    result: pd.DataFrame = analyzer.analyze_routes(prepared_data)
+    prepared_data: pd.DataFrame = analyzer.analyze_routes(prepared_data, analyzer.key_columns[:2])
+    prepared_data = analyzer.analyze_routes(prepared_data, analyzer.key_columns[:1])
+    result = analyzer.analyze_routes(prepared_data, analyzer.key_columns[1:2])
 
     # Routes 3 and 4 should be marked as changes because they have similar key parameters to route 1
     assert result['category_route'].iloc[0] == 'Новый маршрут'
@@ -333,7 +335,7 @@ def test_run_with_data(
 
     mock_fetch.assert_called_once()
     mock_prepare.assert_called_once_with(mock_df)
-    mock_analyze.assert_called_once_with(mock_df)
+    assert 3 == mock_analyze.call_count
     mock_insert.assert_called_once_with(mock_df)
 
 
