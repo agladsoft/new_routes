@@ -4,6 +4,7 @@ from typing import Optional
 from datetime import datetime
 from scripts.__init__ import *
 from typing import List, Union
+from bloom_filter import BloomFilter
 from clickhouse_connect import get_client
 from clickhouse_connect.driver import Client
 from clickhouse_connect.driver.query import QueryResult
@@ -29,6 +30,7 @@ class RouteAnalyzer:
             'shipper_okpo': 'shipper_by_puzt',
             'consignee_okpo': 'consignee_by_puzt'
         }
+        self.bloom = BloomFilter(max_elements=1000000, error_rate=0.01)  # Настроить параметры под объем данных
 
     def connect_to_db(self) -> Client:
         """
@@ -152,12 +154,22 @@ class RouteAnalyzer:
         :return: A Pandas DataFrame object with the 'category_route' column updated.
         """
         logger.info("Analyzing routes for changes...")
+        latest_index: dict = {}  # Словарь для хранения последних индексов маршрутов
         for i in range(1, len(df)):
-            for j in reversed(range(i)):
-                if self.compare_and_update_routes(df, i, j):
+            route_key = str(tuple(df.loc[i, ["type_of_transportation"] + self.key_columns[:2]]))
+
+            # Если маршрут уже есть в фильтре Блума, выполняем полное сравнение
+            if route_key in self.bloom:
+                # Если маршрут уже встречался, проверяем последнее его появление
+                j: Optional[int] = latest_index.get(route_key)
+                if j is not None and self.compare_and_update_routes(df, i, j):
                     df.loc[i, 'category_route'] = 'Изменение в маршруте'
-                    logger.debug(f"Route at index {i} marked as 'Изменение в маршруте'")
-                    break
+                    logger.info(f"Route at index {i} marked as 'Изменение в маршруте'")
+            else:
+                latest_index[route_key] = i
+            # Добавляем маршрут в фильтр Блума
+            self.bloom.add(route_key)
+
         logger.info("Route analysis completed.")
         return df
 
