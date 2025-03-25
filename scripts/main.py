@@ -165,13 +165,14 @@ class RouteAnalyzer:
         for i in range(1, len(df)):
             route_key: str = str(tuple(df.loc[i, ["type_of_transportation"] + key_columns]))
             if route_key in bloom:
-                for j in list(latest_index.get(route_key, [])):
+                indices: deque = latest_index.get(route_key, deque())
+                for j in indices:
                     if self.compare_and_update_routes(df, i, j):
                         df.loc[i, 'category_route'] = 'Изменение в маршруте'
                         logger.info(f"Route at index {i} marked as 'Изменение в маршруте'")
                         break
-                    elif i not in latest_index[route_key]:
-                        latest_index[route_key].appendleft(i)
+                else:
+                    indices.appendleft(i)
             else:
                 latest_index[route_key] = deque([i])
             bloom.add(route_key)
