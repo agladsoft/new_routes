@@ -1,8 +1,8 @@
 import sys
 import pandas as pd
-from __init__ import *
 from typing import Optional
 from datetime import datetime
+from scripts.__init__ import *
 from typing import List, Union
 from clickhouse_connect import get_client
 from clickhouse_connect.driver import Client
