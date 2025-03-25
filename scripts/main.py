@@ -2,6 +2,7 @@ import sys
 import pandas as pd
 from typing import Optional
 from datetime import datetime
+from collections import deque
 from scripts.__init__ import *
 from typing import List, Union
 from bloom_filter import BloomFilter
@@ -30,7 +31,6 @@ class RouteAnalyzer:
             'shipper_okpo': 'shipper_by_puzt',
             'consignee_okpo': 'consignee_by_puzt'
         }
-        self.bloom = BloomFilter(max_elements=1000000, error_rate=0.01)  # Настроить параметры под объем данных
 
     def connect_to_db(self) -> Client:
         """
@@ -69,7 +69,9 @@ class RouteAnalyzer:
         if df is not None:
             logger.info(f"Fetched {len(df)} rows of data.")
             df = self.prepare_data(df)
-            df = self.analyze_routes(df)
+            df = self.analyze_routes(df, self.key_columns[:2])
+            df = self.analyze_routes(df, self.key_columns[:1])
+            df = self.analyze_routes(df, self.key_columns[1:2])
             self.insert_data(df)
             logger.info("Route analysis completed and data inserted.")
 
@@ -142,33 +144,37 @@ class RouteAnalyzer:
         logger.info(f"Prepared {len(df)} rows of data.")
         return df
 
-    def analyze_routes(self, df: pd.DataFrame) -> pd.DataFrame:
+    def analyze_routes(self, df: pd.DataFrame, key_columns: list) -> pd.DataFrame:
         """
-        Analyzes routes and identifies changes.
+        Analyze routes for changes based on key columns.
 
-        This method iterates over the rows of the dataframe, comparing each row with all previous rows.
-        If a match is found, the category of the current row is set to 'Изменение в маршруте'.
-        The method returns the modified dataframe.
+        This method takes a Pandas DataFrame object and a list of key columns as parameters.
+        It iterates over the DataFrame and compares each row with all previous rows that have the same key columns.
+        If a match is found, the current row is marked as 'Изменение в маршруте' in the 'category_route' column.
+        The method uses a Bloom filter and a dictionary to keep track of the latest index for each route key.
+        It returns the modified Pandas DataFrame object.
 
         :param df: A Pandas DataFrame object.
+        :param key_columns: A list of key columns to compare routes.
         :return: A Pandas DataFrame object with the 'category_route' column updated.
         """
         logger.info("Analyzing routes for changes...")
-        latest_index: dict = {}  # Словарь для хранения последних индексов маршрутов
-        for i in range(1, len(df)):
-            route_key = str(tuple(df.loc[i, ["type_of_transportation"] + self.key_columns[:2]]))
+        latest_index: dict = {}
+        bloom: BloomFilter = BloomFilter(max_elements=1000000, error_rate=0.01)
 
-            # Если маршрут уже есть в фильтре Блума, выполняем полное сравнение
-            if route_key in self.bloom:
-                # Если маршрут уже встречался, проверяем последнее его появление
-                j: Optional[int] = latest_index.get(route_key)
-                if j is not None and self.compare_and_update_routes(df, i, j):
-                    df.loc[i, 'category_route'] = 'Изменение в маршруте'
-                    logger.info(f"Route at index {i} marked as 'Изменение в маршруте'")
+        for i in range(1, len(df)):
+            route_key: str = str(tuple(df.loc[i, ["type_of_transportation"] + key_columns]))
+            if route_key in bloom:
+                for j in list(latest_index.get(route_key, [])):
+                    if self.compare_and_update_routes(df, i, j):
+                        df.loc[i, 'category_route'] = 'Изменение в маршруте'
+                        logger.info(f"Route at index {i} marked as 'Изменение в маршруте'")
+                        break
+                    elif i not in latest_index[route_key]:
+                        latest_index[route_key].appendleft(i)
             else:
-                latest_index[route_key] = i
-            # Добавляем маршрут в фильтр Блума
-            self.bloom.add(route_key)
+                latest_index[route_key] = deque([i])
+            bloom.add(route_key)
 
         logger.info("Route analysis completed.")
         return df
